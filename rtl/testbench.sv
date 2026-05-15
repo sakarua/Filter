@@ -41,7 +41,6 @@ module testbench;
 		prstn      = 1'b0;
 		pixel_clk  = 1'b0;
 		pixel_rstn = 1'b0;
-		ir_strobe_i = 1'b0;
 		#1us;
 		prstn = 1'b1;
 		#1us;
@@ -77,7 +76,7 @@ module testbench;
 
 	// SRAM 仿真模型
 	sram_2Mx64 u_mem (
-		.clk  (mem_clk),
+		.clk  (pixel_clk),
 		.csn  (mem_csn),
 		.adr  (mem_adr),
 		.wen  (mem_wen),
@@ -135,9 +134,13 @@ module testbench;
 		/////////////
 		wait (int_out == 1);
 		#5ms;
+		$finish(2);
 	end
-	#20ms;
-	$finish(2);
+
+	initial begin
+		#20ms;
+		$finish(2);
+	end
 
 	//`define FSDB_DUMP
 `ifdef FSDB_DUMP

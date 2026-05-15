@@ -7,7 +7,7 @@ module sram_2Mx64 #(
 	input              clk,
 	input              csn,
 	input  [AW-1:0]     adr,
-	input  [BW-1:0]     wen,
+	input  [BW-1:0]     wen, //低有效的按字节写使能
 	input  [DW-1:0]     din,
 	output [DW-1:0]     dout
 );

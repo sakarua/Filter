@@ -1,16 +1,13 @@
 module RGB2YCbCr
 (
     //module clock
-    input               clk             ,  
-    input               rst_n           ,  
- 
-    input       [7:0]   red         ,   
-    input       [7:0]   green       ,   
-    input       [7:0]   blue        ,   
-
-
-    output      [7:0]   y           ,  
-    output      [7:0]   cb          ,  
+    input               clk,  
+    input               rst_n,  
+    input       [7:0]   red,   
+    input       [7:0]   green,   
+    input       [7:0]   blue,   
+    output      [7:0]   y,  
+    output      [7:0]   cb,  
     output      [7:0]   cr             
 );
 
@@ -113,7 +110,4 @@ always @(posedge clk or negedge rst_n) begin
         cr1 <= cr0[15:8];
     end
 end
-
-
-
 endmodule
