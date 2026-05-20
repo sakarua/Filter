@@ -73,7 +73,7 @@ filter_apb_if u_filter_apb_if (
 	.baseImageO      (baseImageO),
 	.frame_width     (frame_width),
 	.frame_height    (frame_height),
-	.pixel_size      (pixel_size),
+	.pixel_size      (pixel_size),//输入信号格式选择：0=RGB888, 1=RAW16
 	.int_out         (int_out)
 );
 
@@ -88,19 +88,16 @@ always @(posedge clk or negedge rstn) begin
 		frame_start_sync_d <= frame_start_sync;
 	end
 end
-
-assign frame_start = frame_start_sync & ~frame_start_sync_d;
+assign frame_start = frame_start_sync & ~frame_start_sync_d;//检测上升沿
 
 reg  [3:0]  state;
 reg  [31:0] input_byte_addr;
 reg  [31:0] pixel_count;
 reg  [31:0] total_pixels;
 reg  [ 4:0] drain_count;
-
 wire [1:0]  bytes_per_pixel = pixel_size ? FORMAT_RAW16_BYTES : FORMAT_RGB888_BYTES;
 wire [23:0] read_byte_addr  = input_byte_addr[23:0];
-wire [20:0] read_word_addr  = read_byte_addr[23:3];
-
+wire [20:0] read_word_addr  = read_byte_addr[23:3]; //用于访问SRAM的地址，单位是64-bit word
 wire [7:0] unpack_red;
 wire [7:0] unpack_green;
 wire [7:0] unpack_blue;
@@ -114,7 +111,7 @@ pixel_unpacker u_pixel_unpacker (
 	.capture_word1 (state == ST_CAP1),
 	.format_raw16 (pixel_size),
 	.mem_di       (mem_di),
-	.byte_offset  (read_byte_addr[2:0]),
+	.byte_offset  (read_byte_addr[2:0]), //word内的字节偏移
 	.red          (unpack_red),
 	.green        (unpack_green),
 	.blue         (unpack_blue),

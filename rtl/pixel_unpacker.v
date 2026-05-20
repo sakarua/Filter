@@ -17,30 +17,79 @@ module pixel_unpacker (
     output wire [15:0] raw_gray
 );
 
+localparam ST_IDLE   = 2'd0;
+localparam ST_WAIT   = 2'd1;
+localparam ST_UNPACK = 2'd2;
+
+reg [1:0]  state;
 reg [63:0] word0;
 reg [63:0] word1;  //一个像素数据可能跨越两个连续的64-bit word，因此需要两个寄存器暂存数据
+reg        need_word1_lat;
+reg [ 7:0] red_r;
+reg [ 7:0] green_r;
+reg [ 7:0] blue_r;
+reg [15:0] raw_gray_r;
+
+wire need_word1 = format_raw16 ? (byte_offset > 3'd6) : (byte_offset > 3'd5);
+wire [127:0] byte_window = need_word1_lat ? {word1, word0} : {64'd0, word0}; //拼成一个完整的窗口
+wire [6:0]   bit_offset  = {byte_offset, 3'b000}; //转换成位偏移
+
+wire [23:0] rgb888 = byte_window >> bit_offset; //移动到该像素的起始位置
+wire [15:0] raw16  = byte_window >> bit_offset;
+
+assign red      = red_r;
+assign green    = green_r;
+assign blue     = blue_r;
+assign raw_gray = raw_gray_r;
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        word0 <= 64'd0;
-        word1 <= 64'd0;
+        state          <= ST_IDLE;
+        word0          <= 64'd0;
+        word1          <= 64'd0;
+        need_word1_lat <= 1'b0;
+        red_r          <= 8'd0;
+        green_r        <= 8'd0;
+        blue_r         <= 8'd0;
+        raw_gray_r     <= 16'd0;
     end else begin
-        if (capture_word0)
-            word0 <= mem_di;
-        if (capture_word1)
-            word1 <= mem_di;
+        case (state)
+            ST_IDLE: begin
+                if (capture_word0) begin
+                    word0          <= mem_di;
+                    need_word1_lat <= need_word1;
+                    if (need_word1)
+                        state <= ST_WAIT;
+                    else
+                        state <= ST_UNPACK;
+                end
+            end
+
+            ST_WAIT: begin
+                if (capture_word1) begin
+                    word1 <= mem_di;
+                    state <= ST_UNPACK;
+                end
+            end
+
+            ST_UNPACK: begin
+                if (format_raw16) begin
+                    red_r      <= 8'd0;
+                    green_r    <= 8'd0;
+                    blue_r     <= 8'd0;
+                    raw_gray_r <= raw16;
+                end else begin
+                    red_r      <= rgb888[7:0];
+                    green_r    <= rgb888[15:8];
+                    blue_r     <= rgb888[23:16];
+                    raw_gray_r <= 16'd0;
+                end
+                state <= ST_IDLE;
+            end
+
+            default: state <= ST_IDLE;
+        endcase
     end
 end
-
-wire [127:0] byte_window = {word1, word0}; //拼成一个完整的窗口
-wire [6:0]   bit_offset  = {byte_offset, 3'b000}; //转换成位偏移
-
-wire [23:0] rgb888 = byte_window >> bit_offset;
-wire [15:0] raw16  = byte_window >> bit_offset;
-
-assign red      = rgb888[ 7: 0];
-assign green    = rgb888[15: 8];
-assign blue     = rgb888[23:16];
-assign raw_gray = format_raw16 ? raw16 : 16'd0;
 
 endmodule
