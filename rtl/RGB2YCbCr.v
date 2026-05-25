@@ -1,23 +1,26 @@
 module RGB2YCbCr
 (
     //module clock
-    input               clk,  
-    input               rst_n,  
-    input       [7:0]   red,   
-    input       [7:0]   green,   
-    input       [7:0]   blue,   
-    output      [7:0]   y,  
-    output      [7:0]   cb,  
+    input               clk             ,  
+    input               rst_n           ,  
+ 
+    input       [7:0]   red         ,   
+    input       [7:0]   green       ,   
+    input       [7:0]   blue        ,   
+
+
+    output      [7:0]   y           ,  
+    output      [7:0]   cb          ,  
     output      [7:0]   cr             
 );
 
 //reg define
-reg  [31:0]   rgb_r_m0, rgb_r_m1, rgb_r_m2;
-reg  [31:0]   rgb_g_m0, rgb_g_m1, rgb_g_m2;
-reg  [31:0]   rgb_b_m0, rgb_b_m1, rgb_b_m2;
-reg  [31:0]   y0 ;
-reg  [31:0]   cb0;
-reg  [31:0]   cr0;
+reg  [15:0]   rgb_r_m0, rgb_r_m1, rgb_r_m2;
+reg  [15:0]   rgb_g_m0, rgb_g_m1, rgb_g_m2;
+reg  [15:0]   rgb_b_m0, rgb_b_m1, rgb_b_m2;
+reg  [15:0]   y0 ;
+reg  [15:0]   cb0;
+reg  [15:0]   cr0;
 reg  [ 7:0]   y1 ;
 reg  [ 7:0]   cb1;
 reg  [ 7:0]   cr1;
@@ -70,13 +73,13 @@ always @(posedge clk or negedge rst_n) begin
         rgb_b_m2 <= 16'd0;
     end
     else begin
-        rgb_r_m0 <= rgb888_r * 16'd19595;
+        rgb_r_m0 <= rgb888_r * 8'd77 ;
         rgb_r_m1 <= rgb888_r * 8'd43 ;
         rgb_r_m2 <= rgb888_r << 3'd7 ;
-        rgb_g_m0 <= rgb888_g * 16'd38470;
+        rgb_g_m0 <= rgb888_g * 8'd150;
         rgb_g_m1 <= rgb888_g * 8'd85 ;
         rgb_g_m2 <= rgb888_g * 8'd107;
-        rgb_b_m0 <= rgb888_b * 16'd7471;
+        rgb_b_m0 <= rgb888_b * 8'd29 ;
         rgb_b_m1 <= rgb888_b << 3'd7 ;
         rgb_b_m2 <= rgb888_b * 8'd21 ;
     end
@@ -90,9 +93,9 @@ always @(posedge clk or negedge rst_n) begin
         cr0 <= 16'd0;
     end
     else begin
-        y0  <= rgb_r_m0 + rgb_g_m0 + rgb_b_m0 + 32'd32768;
-        cb0 <= rgb_b_m1 - rgb_r_m1 - rgb_g_m1 + 32'd32768;
-        cr0 <= rgb_r_m2 - rgb_g_m2 - rgb_b_m2 + 32'd32768;
+        y0  <= rgb_r_m0 + rgb_g_m0 + rgb_b_m0;
+        cb0 <= rgb_b_m1 - rgb_r_m1 - rgb_g_m1 + 16'd32768;
+        cr0 <= rgb_r_m2 - rgb_g_m2 - rgb_b_m2 + 16'd32768;
     end
 
 end
@@ -105,10 +108,12 @@ always @(posedge clk or negedge rst_n) begin
         cr1 <= 8'd0;
     end
     else begin
-        // 四舍五入：加128后取高8位（避免表达式切片语法，使用右移）
-        y1  <= ((y0 + 32'd128) >> 16);
+        y1  <= y0 [15:8];
         cb1 <= cb0[15:8];
         cr1 <= cr0[15:8];
     end
 end
+
+
+
 endmodule

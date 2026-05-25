@@ -1,67 +1,61 @@
 %% 读取图像
-grayImage = imread('test_img.raw');
-figure;
-%% 显示原图
-subplot(1, 3, 1);
-imshow(grayImage);
-title('原图像');
-%% 灰度化 
-%% grayImage = rgb2gray(originalImage);
-%% 图像尺寸
-[img_height, img_width] = size(grayImage); 
-medianImage = zeros(img_height, img_width);
-%% 定义参数
-windowSize = 3;  % 窗口大小，奇数
-%% 遍历像素 计算窗口均值
-halfWindowSize = floor(windowSize / 2);
-for i = 1:img_height
-    for j = 1:img_width
-        % 窗口边界
-        r1 = max(i - halfWindowSize, 1);    %窗口上边界
-        r2 = min(i + halfWindowSize, img_height);%窗口下边界
-        c1 = max(j - halfWindowSize, 1);%窗口左边界
-        c2 = min(j + halfWindowSize, img_width);%窗口右边界
-        
-        % 提取窗口
-        window = grayImage(r1:r2, c1:c2);
-        
-        % 计算窗口内的中值
-        localmedian = median(window(:));
-        
-        medianImage(i,j) = localmedian;
-    end
-end
-%% 无符号8bit
-medianImage = uint8(medianImage);   
-%% 将原图像转换为二值图像
-binarizedImage = imbinarize(grayImage);
+rawCFA = rawread('test_img.raw');      % 原始CFA数据（单通道）
+rgbImage = raw2rgb('test_img.raw');    % 彩色RGB图像（仅用于显示）
 
-% 显示原图和处理后的图像
+%% 中值滤波（处理原始CFA数据）
+windowSize = 3;
+filteredCFA = medfilt2(rawCFA, [windowSize windowSize]);
+
+%% 显示对比结果
+figure;
+subplot(1, 3, 1);
+imshow(rgbImage);
+title('原彩色图像');
+
 subplot(1, 3, 2);
-imshow(grayImage);
-title('灰度化图像');
+imshow(rawCFA, []);
+title('原始CFA数据');
 
 subplot(1, 3, 3);
-imshow(medianImage);
-title('中值滤波图像');
+imshow(filteredCFA, []);
+title('中值滤波后CFA');
 
-%% 获取图像的尺寸信息
-[image_height, image_width, num_channels] = size(medianImage);
+%% 保存为TXT文件（十六进制格式）
+% 获取尺寸
+[img_height, img_width] = size(filteredCFA);
 
-%% 打开文件以写入
-file_id = fopen('matlab_raw.txt', 'w+');
+% 打开文件
+fileID = fopen('median_filtered_raw.txt', 'w');
 
-%% 遍历每一个像素并写入到文件中
-for row_index = 1:image_height
-    for col_index = 1:image_width 
-        for channel_index = 1:num_channels
-            % 将每个像素值写入文件，以十六进制格式表示
-            fprintf(file_id, '%02x', medianImage(row_index, col_index, channel_index));
+% 写入数据
+for i = 1:img_height
+    for j = 1:img_width
+        % 获取像素值
+        pixelValue = filteredCFA(i, j);
+        
+        % 根据数据类型决定输出格式
+        if isa(pixelValue, 'uint16')
+            % 16位数据：输出4位十六进制
+            fprintf(fileID, '%04x', pixelValue);
+        elseif isa(pixelValue, 'uint8')
+            % 8位数据：输出2位十六进制
+            fprintf(fileID, '%02x', pixelValue);
+        else
+            % double类型：先转为uint16再输出
+            fprintf(fileID, '%04x', uint16(pixelValue));
         end
-        % 每行像素结束后换行
-        fprintf(file_id, '\n');
+        
+        % 每列之间加空格（可选，便于阅读）
+        if j < img_width
+            fprintf(fileID, ' ');
+        end
     end
+    % 每行结束后换行
+    fprintf(fileID, '\n');
 end
 
-%% 关闭文件
-fclose(file_id);
+% 关闭文件
+fclose(fileID);
+
+fprintf('TXT文件已保存：median_filtered_raw.txt\n');
+fprintf('图像尺寸：%d × %d\n', img_height, img_width);
