@@ -12,9 +12,12 @@ module pixel_matrix_3x3 #(
     input  wire                    pixel_valid,
     input  wire [DATA_WIDTH-1:0]   pixel_data,
     input  wire [15:0]             frame_width,
+    input  wire [15:0]             stream_width,
 
     output reg                     window_valid,
     output reg  [31:0]             center_index,
+    output reg  [15:0]             center_row,
+    output reg  [15:0]             center_col,
     output reg  [DATA_WIDTH-1:0]   data11,
     output reg  [DATA_WIDTH-1:0]   data12,
     output reg  [DATA_WIDTH-1:0]   data13,
@@ -28,6 +31,7 @@ module pixel_matrix_3x3 #(
 
 reg [DATA_WIDTH-1:0] line0 [0:MAX_FRAME_WIDTH-1];
 reg [DATA_WIDTH-1:0] line1 [0:MAX_FRAME_WIDTH-1];
+integer              init_idx;
 
 reg [15:0] col;
 reg [15:0] row;
@@ -39,7 +43,7 @@ reg [DATA_WIDTH-1:0] line1_d2;
 reg [DATA_WIDTH-1:0] curr_d1;
 reg [DATA_WIDTH-1:0] curr_d2;
 
-wire width_last = (col == frame_width - 16'd1);
+wire width_last = (col == stream_width - 16'd1);
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -53,6 +57,8 @@ always @(posedge clk or negedge rst_n) begin
         curr_d2      <= {DATA_WIDTH{1'b0}};
         window_valid <= 1'b0;
         center_index <= 32'd0;
+        center_row   <= 16'd0;
+        center_col   <= 16'd0;
         data11       <= {DATA_WIDTH{1'b0}};
         data12       <= {DATA_WIDTH{1'b0}};
         data13       <= {DATA_WIDTH{1'b0}};
@@ -62,6 +68,10 @@ always @(posedge clk or negedge rst_n) begin
         data31       <= {DATA_WIDTH{1'b0}};
         data32       <= {DATA_WIDTH{1'b0}};
         data33       <= {DATA_WIDTH{1'b0}};
+        for (init_idx = 0; init_idx < MAX_FRAME_WIDTH; init_idx = init_idx + 1) begin
+            line0[init_idx] <= {DATA_WIDTH{1'b0}};
+            line1[init_idx] <= {DATA_WIDTH{1'b0}};
+        end
     end else if (frame_start) begin
         col          <= 16'd0;
         row          <= 16'd0;
@@ -73,12 +83,20 @@ always @(posedge clk or negedge rst_n) begin
         curr_d2      <= {DATA_WIDTH{1'b0}};
         window_valid <= 1'b0;
         center_index <= 32'd0;
+        center_row   <= 16'd0;
+        center_col   <= 16'd0;
+        for (init_idx = 0; init_idx < MAX_FRAME_WIDTH; init_idx = init_idx + 1) begin
+            line0[init_idx] <= {DATA_WIDTH{1'b0}};
+            line1[init_idx] <= {DATA_WIDTH{1'b0}};
+        end
     end else begin
         window_valid <= 1'b0;
 
         if (pixel_valid) begin
-            if ((row >= 16'd2) && (col >= 16'd2)) begin
+            if ((row >= 16'd1) && (col >= 16'd1)) begin
                 window_valid <= 1'b1;
+                center_row   <= row - 16'd1;
+                center_col   <= col - 16'd1;
                 center_index <= ((row - 16'd1) * frame_width) + (col - 16'd1);
                 data11       <= line0_d2;
                 data12       <= line0_d1;

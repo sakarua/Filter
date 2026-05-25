@@ -1,5 +1,5 @@
 `define PROBE_APB 1
-
+`timescale 1ns/10ps
 // APB 主机驱动模型：用于仿真中发起 APB 读写访问
 module apb_host_driver (
 	input  pclk,
@@ -15,8 +15,7 @@ module apb_host_driver (
 	input      [31:0] prdata
 );
 
-	parameter dealy = 2;
-
+	parameter delay = 2;
 	reg        state_wr, state_rd;
 	reg        wr_cmd, wr_sta, wr_ena, wr_end;
 	reg        rd_cmd, rd_sta, rd_ena, rd_end;
@@ -50,11 +49,9 @@ module apb_host_driver (
 					paddr   <= addr_w;
 					pwdata  <= data_w;
 				end
-
 				if (wr_ena) begin
 					penable <= 1'd1;
 				end
-
 				if (pready) begin
 					psel    <= 1'd0;
 					penable <= 1'd0;
@@ -68,11 +65,9 @@ module apb_host_driver (
 					paddr   <= addr_r;
 					pwdata  <= 32'd0;
 				end
-
 				if (rd_ena) begin
 					penable <= 1'd1;
 				end
-
 				if (pready) begin
 					psel    <= 1'd0;
 					penable <= 1'd0;

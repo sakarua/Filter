@@ -3,7 +3,7 @@ clc;
 clear all;
 
 %% 读取图像文件 换成自己图片的路径 bmp/png/jpg均可
-image_rgb = imread('night1.bmp');
+image_rgb = imread('test_img.bmp');
 
 %% 显示图像
 imshow(image_rgb);
@@ -12,7 +12,7 @@ imshow(image_rgb);
 [image_height, image_width, num_channels] = size(image_rgb);
 
 %% 打开文件以写入
-file_id = fopen('img.txt', 'w+');
+file_id = fopen('bmp.txt', 'w+');
 
 %% 遍历每一个像素并写入到文件中
 for row_index = 1:image_height

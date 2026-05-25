@@ -1,4 +1,4 @@
-// Median filter, 3 clock latency.
+// Median filter with variable window mask, 3 clock latency.
 module median_filter_3x3 #(
     parameter DATA_WIDTH = 8
 ) (
@@ -13,97 +13,72 @@ module median_filter_3x3 #(
     input wire [DATA_WIDTH-1:0]     data31,
     input wire [DATA_WIDTH-1:0]     data32,
     input wire [DATA_WIDTH-1:0]     data33,
+    input wire [8:0]                mask,
     output wire [DATA_WIDTH-1:0]    target_data
 );
+reg [DATA_WIDTH-1:0] val [0:8];
+reg [DATA_WIDTH-1:0] pack [0:8];
+reg [DATA_WIDTH-1:0] sort [0:8];
+reg [DATA_WIDTH-1:0] median_comb;
+reg [DATA_WIDTH-1:0] median_d0;
+reg [DATA_WIDTH-1:0] median_d1;
+reg [DATA_WIDTH-1:0] median_d2;
+reg [DATA_WIDTH:0]   sum_mid;
+integer i;
+integer j;
+integer count;
 
-wire [DATA_WIDTH-1:0] max_data1;
-wire [DATA_WIDTH-1:0] mid_data1;
-wire [DATA_WIDTH-1:0] min_data1;
-wire [DATA_WIDTH-1:0] max_data2;
-wire [DATA_WIDTH-1:0] mid_data2;
-wire [DATA_WIDTH-1:0] min_data2;
-wire [DATA_WIDTH-1:0] max_data3;
-wire [DATA_WIDTH-1:0] mid_data3;
-wire [DATA_WIDTH-1:0] min_data3;
-wire [DATA_WIDTH-1:0] max_min_data;
-wire [DATA_WIDTH-1:0] mid_mid_data;
-wire [DATA_WIDTH-1:0] min_max_data;
+always @* begin
+    val[0] = data11; val[1] = data12; val[2] = data13;
+    val[3] = data21; val[4] = data22; val[5] = data23;
+    val[6] = data31; val[7] = data32; val[8] = data33;
 
-sort3 #(.DATA_WIDTH(DATA_WIDTH)) u_sort3_1 (
-    .clk      (clk),
-    .rst_n    (rst_n),
-    .data1    (data11),
-    .data2    (data12),
-    .data3    (data13),
-    .max_data (max_data1),
-    .mid_data (mid_data1),
-    .min_data (min_data1)
-);
+    count = 0;
+    for (i = 0; i < 9; i = i + 1) begin
+        if (mask[i]) begin
+            pack[count] = val[i];
+            count = count + 1;
+        end
+    end
+    for (i = count; i < 9; i = i + 1) begin
+        pack[i] = {DATA_WIDTH{1'b1}};
+    end
 
-sort3 #(.DATA_WIDTH(DATA_WIDTH)) u_sort3_2 (
-    .clk      (clk),
-    .rst_n    (rst_n),
-    .data1    (data21),
-    .data2    (data22),
-    .data3    (data23),
-    .max_data (max_data2),
-    .mid_data (mid_data2),
-    .min_data (min_data2)
-);
+    for (i = 0; i < 9; i = i + 1)
+        sort[i] = pack[i];
 
-sort3 #(.DATA_WIDTH(DATA_WIDTH)) u_sort3_3 (
-    .clk      (clk),
-    .rst_n    (rst_n),
-    .data1    (data31),
-    .data2    (data32),
-    .data3    (data33),
-    .max_data (max_data3),
-    .mid_data (mid_data3),
-    .min_data (min_data3)
-);
+    for (i = 0; i < 9; i = i + 1) begin
+        for (j = 0; j < 8; j = j + 1) begin
+            if (sort[j] > sort[j + 1]) begin
+                median_comb = sort[j];
+                sort[j] = sort[j + 1];
+                sort[j + 1] = median_comb;
+            end
+        end
+    end
 
-sort3 #(.DATA_WIDTH(DATA_WIDTH)) u_sort3_4 (
-    .clk      (clk),
-    .rst_n    (rst_n),
-    .data1    (max_data1),
-    .data2    (max_data2),
-    .data3    (max_data3),
-    .max_data (),
-    .mid_data (),
-    .min_data (max_min_data)
-);
+    if (count <= 0) begin
+        median_comb = {DATA_WIDTH{1'b0}};
+    end else if (count[0]) begin
+        median_comb = sort[count >> 1];
+    end else begin
+        sum_mid = sort[(count >> 1) - 1] + sort[count >> 1];
+        median_comb = (sum_mid + 1'b1) >> 1;
+    end
+end
 
-sort3 #(.DATA_WIDTH(DATA_WIDTH)) u_sort3_5 (
-    .clk      (clk),
-    .rst_n    (rst_n),
-    .data1    (mid_data1),
-    .data2    (mid_data2),
-    .data3    (mid_data3),
-    .max_data (),
-    .mid_data (mid_mid_data),
-    .min_data ()
-);
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        median_d0 <= {DATA_WIDTH{1'b0}};
+        median_d1 <= {DATA_WIDTH{1'b0}};
+        median_d2 <= {DATA_WIDTH{1'b0}};
+    end else begin
+        median_d0 <= median_comb;
+        median_d1 <= median_d0;
+        median_d2 <= median_d1;
+    end
+end
 
-sort3 #(.DATA_WIDTH(DATA_WIDTH)) u_sort3_6 (
-    .clk      (clk),
-    .rst_n    (rst_n),
-    .data1    (min_data1),
-    .data2    (min_data2),
-    .data3    (min_data3),
-    .max_data (min_max_data),
-    .mid_data (),
-    .min_data ()
-);
-
-sort3 #(.DATA_WIDTH(DATA_WIDTH)) u_sort3_7 (
-    .clk      (clk),
-    .rst_n    (rst_n),
-    .data1    (max_min_data),
-    .data2    (mid_mid_data),
-    .data3    (min_max_data),
-    .max_data (),
-    .mid_data (target_data),
-    .min_data ()
-);
+assign target_data = median_d2;
 
 endmodule

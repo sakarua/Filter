@@ -1,12 +1,12 @@
 %% 读取图像
-originalImage = imread('test_img.bmp');
+grayImage = imread('test_img.raw');
 figure;
 %% 显示原图
 subplot(1, 3, 1);
-imshow(originalImage);
+imshow(grayImage);
 title('原图像');
 %% 灰度化 
-grayImage = rgb2gray(originalImage);
+%% grayImage = rgb2gray(originalImage);
 %% 图像尺寸
 [img_height, img_width] = size(grayImage); 
 medianImage = zeros(img_height, img_width);
@@ -49,7 +49,7 @@ title('中值滤波图像');
 [image_height, image_width, num_channels] = size(medianImage);
 
 %% 打开文件以写入
-file_id = fopen('matlab_bmp.txt', 'w+');
+file_id = fopen('matlab_raw.txt', 'w+');
 
 %% 遍历每一个像素并写入到文件中
 for row_index = 1:image_height

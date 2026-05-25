@@ -19,6 +19,10 @@ module sram_2Mx64 #(
 	reg [AW-1:0] addr_reg;
 	integer i;
 
+	initial begin
+		addr_reg = {AW{1'b0}};
+	end
+
 	assign dout = mem[addr_reg];
 
 	always @(posedge clk) begin
