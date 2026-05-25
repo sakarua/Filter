@@ -8,7 +8,7 @@ module sram_reader (
 	input      [15:0] frame_width,
 	input      [15:0] frame_height,
 	input      [63:0] mem_di,
-	input             write_pending,
+	input             write_pending, //有写请求在排队中
 	input             write_active,
 
 	output            read_req,
@@ -41,7 +41,7 @@ reg [23:0] rgb_buf;
 reg [15:0] raw_buf;
 
 reg  [2:0]  read_state;
-reg         read_pending;
+reg         read_pending; //表示像素还有后半段数据未读到
 reg  [31:0] total_pixels;
 reg  [31:0] input_byte_addr;
 reg  [31:0] pixel_count;
@@ -54,9 +54,8 @@ wire [20:0] read_word_addr  = read_byte_addr[23:3];
 wire [2:0]  unpk_byte_offset = read_byte_addr[2:0];//像素起始地址在字内的偏移
 wire [63:0] mem_di_shift = mem_di >> {unpk_byte_offset, 3'b000};//根据像素起始地址调整数据对齐
 
-wire        crossword  = pixel_size ? (unpk_byte_offset > 3'd6) : (unpk_byte_offset > 3'd5);//像素数据是否跨字
-
-wire        pixel_complete   = (read_state == RD_DONE) && (read_pending ? 1'b1 : ~crossword);
+wire crossword = pixel_size ? (unpk_byte_offset > 3'd6) : (unpk_byte_offset > 3'd5);//像素数据是否跨字
+wire pixel_complete = (read_state == RD_DONE) && (read_pending ? 1'b1 : ~crossword);
 
 assign read_req = (read_state == RD_WAIT);
 assign read_active = (read_state == RD_READ) || (read_state == RD_WAIT) || (read_state == RD_DONE);
@@ -68,8 +67,6 @@ assign red      = pixel_size ? 8'd0 : rgb_buf[7:0];
 assign green    = pixel_size ? 8'd0 : rgb_buf[15:8];
 assign blue     = pixel_size ? 8'd0 : rgb_buf[23:16];
 assign raw_gray = pixel_size ? raw_buf : 16'd0;
-
-
 
 //SRAM读取状态机
 always @(posedge clk or negedge rstn) begin
@@ -90,7 +87,7 @@ always @(posedge clk or negedge rstn) begin
 		frame_done <= 1'b0;
 
 		if ((read_state != RD_IDLE) || write_active)
-			frame_cycle_cur <= frame_cycle_cur + 32'd1;
+			frame_cycle_cur <= frame_cycle_cur + 32'd1; //计算读消耗的周期数
 
 		case (read_state)
 			RD_IDLE: begin
@@ -106,7 +103,7 @@ always @(posedge clk or negedge rstn) begin
 			end
 
 			RD_WAIT: begin
-				if (!write_active)
+				if (!write_active) //不能同时读写，所以等写结束
 					read_state <= RD_READ;
 			end
 
@@ -114,16 +111,16 @@ always @(posedge clk or negedge rstn) begin
 				if (!read_pending) begin//第一个字
 					if (pixel_size) begin// RAW16
 						if (crossword)
-							raw_buf[7:0] <= mem_di_shift[7:0];
+							raw_buf[7:0] <= mem_di_shift[7:0]; //先读前一个字节
 						else
-							raw_buf <= mem_di_shift[15:0];
-					end 
+							raw_buf <= mem_di_shift[15:0]; //读完整的两字节
+					end  
                     else begin// RGB888
 						if (crossword) begin
 							if (unpk_byte_offset == 3'd6)
-								rgb_buf[15:0] <= mem_di_shift[15:0];
+								rgb_buf[15:0] <= mem_di_shift[15:0]; //读前两个字节
 							else
-								rgb_buf[7:0] <= mem_di_shift[7:0];
+								rgb_buf[7:0] <= mem_di_shift[7:0]; //读前一个字节
 						end 
                         else begin
 							rgb_buf <= mem_di_shift[23:0];
@@ -141,12 +138,11 @@ always @(posedge clk or negedge rstn) begin
 							rgb_buf[23:8] <= mem_di_shift[15:0];
 					end
 				end
-
 				read_state <= RD_DONE;
 			end
 
 			RD_DONE: begin
-				if (!read_pending && crossword) begin
+				if (!read_pending && crossword) begin //回去读第二个字
 					read_pending <= 1'b1;
 					read_state <= RD_READ;
 				end 
@@ -154,12 +150,11 @@ always @(posedge clk or negedge rstn) begin
 					read_pending <= 1'b0;
 					pixel_count     <= pixel_count + 32'd1;
 					input_byte_addr <= input_byte_addr + bytes_per_pixel;
-
-					if (pixel_count + 32'd1 >= total_pixels)
+					if (pixel_count + 32'd1 >= total_pixels) //读完这个图片了
 						read_state <= RD_DRAIN;
-					else if (write_pending)
+					else if (write_pending) //如果中途需要写sram则停止读，等写完再继续
 						read_state <= RD_HOLD;
-					else
+					else //继续读下一个像素
 						read_state <= RD_READ;
 				end
 			end
@@ -181,7 +176,6 @@ always @(posedge clk or negedge rstn) begin
 					read_state      <= RD_IDLE;
 				end
 			end
-
 			default: read_state <= RD_IDLE;
 		endcase
 	end
