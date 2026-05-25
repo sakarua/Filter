@@ -178,7 +178,9 @@ pixel_matrix_3x3 #(
 
 wire [15:0] filter_data;
 
-median_filter_3x3 #(.DATA_WIDTH(16)) u_median_filter_3x3 (
+median_filter_3x3 #(
+	.DATA_WIDTH(16)
+) u_median_filter_3x3 (
 	.clk         (clk),
 	.rst_n       (rstn),
 	.data11      (data11),

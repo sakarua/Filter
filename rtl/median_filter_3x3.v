@@ -1,6 +1,6 @@
 // Median filter, 3 clock latency.
 module median_filter_3x3 #(
-    parameter DATA_WIDTH = 8
+    parameter DATA_WIDTH = 16
 ) (
     input wire                      clk,
     input wire                      rst_n,
