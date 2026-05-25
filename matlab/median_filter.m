@@ -5,8 +5,17 @@ figure;
 subplot(1, 3, 1);
 imshow(originalImage);
 title('原图像');
-%% 灰度化 
-grayImage = rgb2gray(originalImage);
+%% 灰度化
+% 提取 R, G, B 三通道并转换为 uint32 以防乘法溢出
+R = uint32(originalImage(:, :, 1));
+G = uint32(originalImage(:, :, 2));
+B = uint32(originalImage(:, :, 3));
+
+% 按照 RTL 逻辑进行加权求和
+grayImage = bitsra(R*77 + G*150 + B*29, 8);
+
+% 换回 uint8 类型，确保与后续处理兼容
+grayImage = uint8(grayImage);
 %% 图像尺寸
 [img_height, img_width] = size(grayImage); 
 medianImage = zeros(img_height, img_width);
