@@ -384,13 +384,13 @@ module testbench;
 				 $time, sram_write_cycles, sram_write_bytes);
 		dump_output_to_file;
 		#5ms;
-		$finish;
+		$stop;
 	end
 
 	initial begin
 		#20ms;
 		$display("[%0t] ERROR: simulation timeout", $time);
-		$finish;
+		$stop;
 	end
 
 	//`define FSDB_DUMP

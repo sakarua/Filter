@@ -26,7 +26,7 @@ module sram_2Mx64 #(
 	assign dout = mem[addr_reg];
 
 	always @(posedge clk) begin
-		if (~csn)
+		if (~csn && (&wen))
 			addr_reg <= adr;
 	end
 

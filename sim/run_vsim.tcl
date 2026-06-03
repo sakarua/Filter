@@ -34,10 +34,13 @@ puts "INFO: compiling RTL..."
 vlog -sv -work work {*}$rtl_files
 
 puts "INFO: starting simulation..."
-vsim -c -t 1ps work.testbench \
+vsim -c -onfinish stop -voptargs=+acc -t 1ps work.testbench \
     +OUT_FILE=rtl/output
+
+puts "INFO: logging all hierarchy signals..."
+log -r /*
+add wave -r /*
 
 run -all
 
 puts "INFO: simulation finished"
-quit -f
