@@ -1,16 +1,49 @@
 %% 读取图像
-rawCFA = rawread('test_img.raw');      % 原始CFA数据（单通道）
-rgbImage = raw2rgb('test_img.raw');    % 彩色RGB图像（仅用于显示）
-
-%% 中值滤波（处理原始CFA数据）
-windowSize = 3;
-filteredCFA = medfilt2(rawCFA, [windowSize windowSize]);
-
-%% 显示对比结果
+originalImage = imread('test_img.bmp');
 figure;
+%% 显示原图
 subplot(1, 3, 1);
-imshow(rgbImage);
-title('原彩色图像');
+imshow(originalImage);
+title('原图像');
+%% 灰度化
+% 提取 R, G, B 三通道并转换为 uint32 以防乘法溢出
+R = uint32(originalImage(:, :, 1));
+G = uint32(originalImage(:, :, 2));
+B = uint32(originalImage(:, :, 3));
+
+% 按照 RTL 逻辑进行加权求和
+grayImage = bitsra(R*77 + G*150 + B*29, 8);
+
+% 换回 uint8 类型，确保与后续处理兼容
+grayImage = uint8(grayImage);
+%% 图像尺寸
+[img_height, img_width] = size(grayImage); 
+medianImage = zeros(img_height, img_width);
+%% 定义参数
+windowSize = 3;  % 窗口大小，奇数
+%% 遍历像素 计算窗口均值
+halfWindowSize = floor(windowSize / 2);
+for i = 1:img_height
+    for j = 1:img_width
+        % 窗口边界
+        r1 = max(i - halfWindowSize, 1);    %窗口上边界
+        r2 = min(i + halfWindowSize, img_height);%窗口下边界
+        c1 = max(j - halfWindowSize, 1);%窗口左边界
+        c2 = min(j + halfWindowSize, img_width);%窗口右边界
+        
+        % 提取窗口
+        window = grayImage(r1:r2, c1:c2);
+        
+        % 计算窗口内的中值
+        localmedian = median(window(:));
+        
+        medianImage(i,j) = localmedian;
+    end
+end
+%% 无符号8bit
+medianImage = uint8(medianImage);   
+%% 将原图像转换为二值图像
+binarizedImage = imbinarize(grayImage);
 
 subplot(1, 3, 2);
 imshow(rawCFA, []);

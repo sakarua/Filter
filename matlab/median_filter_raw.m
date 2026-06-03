@@ -1,6 +1,6 @@
 clear; clc;
 
-%% 参数设置
+%% 参数设置（根据你的图像修改）
 width = 480;   
 height = 640;  
 windowSize = 3; % 中值滤波窗口大小
@@ -11,7 +11,7 @@ if fileID == -1
     error('无法打开 RAW 文件，请检查路径！');
 end
 
-% 'uint16=>uint16' 确保读取出来的数据直接就是 16位无符号整型
+% 'uint16=>uint16' 确保读取出来的数据直接就是 16位无符号整型 灰度值
 rawData = fread(fileID, width * height, 'uint16=>uint16');
 fclose(fileID);
 
@@ -54,15 +54,13 @@ title('中值滤波后图像');
 
 %% 遍历每一个像素并写入到文件中
 file_id = fopen('matlab_raw.txt', 'w+');
-if file_id == -1
-    error('无法创建输出文件！');
-end
 
-% 此时矩阵已经是标准的 2D 矩阵，直接双重循环按行保存
+% 此时矩阵已经是标准的 2D 矩阵，直接双重循环保存
 for row_index = 1:height
     for col_index = 1:width 
         % 以十六进制 (%04x) 格式写入 16bit 滤波后的像素值
-        fprintf(file_id, '%04x\n', medianImage(row_index, col_index));
+        fprintf(file_id, '%04x', medianImage(row_index, col_index);
+        fprintf(file_id, '\n'); % 每行结束后换行
     end
 end
 

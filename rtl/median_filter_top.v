@@ -242,7 +242,9 @@ wire [8:0] window_mask = {
 	mask_8, mask_7, mask_6, mask_5, mask_4, mask_3, mask_2, mask_1, mask_0
 };
 
-median_filter_3x3 #(.DATA_WIDTH(16)) u_median_filter_3x3 (
+median_filter_3x3 #(
+	.DATA_WIDTH(16)
+) u_median_filter_3x3 (
 	.clk         (clk),
 	.rst_n       (rstn),
 	.data11      (data11),
