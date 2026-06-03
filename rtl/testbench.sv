@@ -17,7 +17,7 @@ module testbench;
 	localparam REG_INT_ENABLE      = 8'h24;
 
 	// Testbench init mode and image size
-	localparam bit INIT_MODE_RAW = 1'b1; // 0 = RGB888, 1 = RAW16
+	localparam bit INIT_MODE_RAW = 1'b0; // 0 = RGB888, 1 = RAW16
 	localparam int IMG_WIDTH  = 480;
 	localparam int IMG_HEIGHT = 640;
 	localparam int INIT_BASE_ADDR = 32'h0000_0000; // byte address for SRAM init start

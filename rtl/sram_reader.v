@@ -41,6 +41,9 @@ localparam RD_PAD_BOTTOM = 3'd7;
 
 reg [23:0] rgb_buf;
 reg [15:0] raw_buf;
+reg [63:0] read_word_cache;
+reg [20:0] read_word_cache_addr;
+reg        read_word_cache_valid;
 
 reg  [2:0]  read_state;
 reg         read_pending;
@@ -57,8 +60,11 @@ reg  [2:0]  hold_state;
 wire [1:0]  bytes_per_pixel = pixel_size ? FORMAT_RAW16_BYTES : FORMAT_RGB888_BYTES;
 wire [23:0] read_byte_addr  = input_byte_addr[23:0];
 wire [20:0] read_word_addr  = read_byte_addr[23:3];
+wire [20:0] read_target_addr = read_word_addr + (read_pending ? 21'd1 : 21'd0);
 wire [2:0]  unpk_byte_offset = read_byte_addr[2:0];
-wire [63:0] mem_di_shift = read_pending ? mem_di : (mem_di >> {unpk_byte_offset, 3'b000});
+wire        read_word_cache_hit = read_word_cache_valid && (read_word_cache_addr == read_target_addr);
+wire [63:0] read_word_data = read_word_cache_hit ? read_word_cache : mem_di;
+wire [63:0] mem_di_shift = read_pending ? read_word_data : (read_word_data >> {unpk_byte_offset, 3'b000});
 
 wire crossword = pixel_size ? (unpk_byte_offset > 3'd6) : (unpk_byte_offset > 3'd5);
 wire pixel_complete = (read_state == RD_DONE) && (read_pending ? 1'b1 : ~crossword);
@@ -66,9 +72,9 @@ wire pad_valid = (read_state == RD_PAD_RIGHT) || (read_state == RD_PAD_BOTTOM);
 wire last_col = (frame_width != 16'd0) && (cur_col == (frame_width - 16'd1));
 wire last_row = (frame_height != 16'd0) && (cur_row == (frame_height - 16'd1));
 
-assign read_req = (read_state == RD_WAIT);
+assign read_req = (read_state == RD_WAIT) && !read_word_cache_hit;
 assign read_active = (read_state == RD_READ) || (read_state == RD_WAIT) || (read_state == RD_DONE);
-assign read_addr = read_word_addr + (read_pending ? 21'd1 : 21'd0);
+assign read_addr = read_target_addr;
 
 assign read_valid = pixel_complete || pad_valid;
 assign read_pixel_index = pixel_count;
@@ -87,6 +93,9 @@ always @(posedge clk or negedge rstn) begin
 		read_pending    <= 1'b0;
 		rgb_buf         <= 24'd0;
 		raw_buf         <= 16'd0;
+		read_word_cache <= 64'd0;
+		read_word_cache_addr <= 21'd0;
+		read_word_cache_valid <= 1'b0;
 		cur_row         <= 16'd0;
 		cur_col         <= 16'd0;
 		pad_bottom_active <= 1'b0;
@@ -111,6 +120,7 @@ always @(posedge clk or negedge rstn) begin
 					drain_count     <= 5'd20;
 					frame_cycle_cur <= 32'd0;
 					read_pending    <= 1'b0;
+					read_word_cache_valid <= 1'b0;
 					cur_row         <= 16'd0;
 					cur_col         <= 16'd0;
 					pad_bottom_active <= 1'b0;
@@ -121,11 +131,48 @@ always @(posedge clk or negedge rstn) begin
 			end
 
 			RD_WAIT: begin
-				if (!write_active)
-					read_state <= RD_READ;
+				if (!write_active) begin
+					if (read_word_cache_hit) begin
+						if (!read_pending) begin
+							if (pixel_size) begin
+								if (crossword)
+									raw_buf[7:0] <= mem_di_shift[7:0];
+								else
+									raw_buf <= mem_di_shift[15:0];
+							end else begin
+								if (crossword) begin
+									if (unpk_byte_offset == 3'd6)
+										rgb_buf[15:0] <= mem_di_shift[15:0];
+									else
+										rgb_buf[7:0] <= mem_di_shift[7:0];
+								end else begin
+									rgb_buf <= mem_di_shift[23:0];
+								end
+							end
+						end else begin
+							if (pixel_size) begin
+								raw_buf[15:8] <= mem_di_shift[7:0];
+							end else begin
+								if (unpk_byte_offset == 3'd6)
+									rgb_buf[23:16] <= mem_di_shift[7:0];
+								else
+									rgb_buf[23:8] <= mem_di_shift[15:0];
+							end
+						end
+						read_state <= RD_DONE;
+					end else begin
+						read_state <= RD_READ;
+					end
+				end
 			end
 
 			RD_READ: begin
+				if (!read_word_cache_hit) begin
+					read_word_cache       <= mem_di;
+					read_word_cache_addr  <= read_target_addr;
+					read_word_cache_valid <= 1'b1;
+				end
+
 				if (!read_pending) begin
 					if (pixel_size) begin
 						if (crossword)
