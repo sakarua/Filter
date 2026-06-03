@@ -1,0 +1,28 @@
+﻿FILTER 源码文件列表（含简要说明）
+生成时间：2026-06-03
+
+[README]
+README.md | 项目说明与使用备注（当前内容为开发备注）
+
+[Simulation Script]
+sim/run_vsim.tcl | ModelSim 批处理脚本：建库、编译 RTL、启动仿真、记录全部波形
+
+[RTL / Testbench]
+rtl/median_filter_top.v | 顶层模块：APB 配置、读 SRAM、灰度化、3x3 窗口、中值滤波、写回仲裁
+rtl/filter_apb_if.v | APB 寄存器接口与状态回读：帧参数、基地址、中断控制
+rtl/apb_host_driver.v | APB 主机驱动模型：在仿真中发起寄存器读写事务
+rtl/sram_reader.v | SRAM 读取与像素拆包状态机：支持 RGB888/RAW16 输入
+rtl/sram_writer.v | SRAM 写回状态机：缓存待写像素并按字节掩码写回
+rtl/pixel_matrix_3x3.v | 流式 3x3 窗口生成器：输出窗口数据与中心像素坐标
+rtl/median_filter_3x3.v | 3x3 中值滤波核心：支持窗口掩码，含流水延迟
+rtl/sort3.v | 3 输入排序单元：输出最大/中值/最小
+rtl/RGB2YCbCr.v | RGB 转 YCbCr 模块：多级流水实现系数变换
+rtl/sram_2Mx64.v | 2M x 64 SRAM 仿真模型：单端口、按字节低有效写使能
+rtl/testbench.sv | 顶层测试平台：初始化图像、APB 配置、运行并导出输出结果
+
+[MATLAB]
+matlab/img2txt.m | 将 BMP 图像转为十六进制文本（供仿真初始化使用）
+matlab/raw2txt.m | 将 16bit RAW 图像转为十六进制文本
+matlab/median_filter.m | MATLAB 端 RGB->灰度与中值滤波对照脚本
+matlab/median_filter_raw.m | MATLAB 端 RAW16 中值滤波脚本（当前文件含语法问题，待修正）
+matlab/histeqtest.m | 灰度图直方图均衡化实验脚本

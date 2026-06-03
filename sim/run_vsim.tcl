@@ -22,7 +22,6 @@ set rtl_files [list \
     [file join $rtl_dir "sram_reader.v"] \
     [file join $rtl_dir "sram_writer.v"] \
     [file join $rtl_dir "pixel_matrix_3x3.v"] \
-    [file join $rtl_dir "sort3.v"] \
     [file join $rtl_dir "median_filter_3x3.v"] \
     [file join $rtl_dir "RGB2YCbCr.v"] \
     [file join $rtl_dir "sram_2Mx64.v"] \
