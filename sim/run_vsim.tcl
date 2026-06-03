@@ -22,7 +22,6 @@ set rtl_files [list \
     [file join $rtl_dir "sram_reader.v"] \
     [file join $rtl_dir "sram_writer.v"] \
     [file join $rtl_dir "pixel_matrix_3x3.v"] \
-    [file join $rtl_dir "sort3.v"] \
     [file join $rtl_dir "median_filter_3x3.v"] \
     [file join $rtl_dir "RGB2YCbCr.v"] \
     [file join $rtl_dir "sram_2Mx64.v"] \
@@ -34,10 +33,13 @@ puts "INFO: compiling RTL..."
 vlog -sv -work work {*}$rtl_files
 
 puts "INFO: starting simulation..."
-vsim -c -t 1ps work.testbench \
+vsim -c -onfinish stop -voptargs=+acc -t 1ps work.testbench \
     +OUT_FILE=rtl/output
+
+puts "INFO: logging all hierarchy signals..."
+log -r /*
+add wave -r /*
 
 run -all
 
 puts "INFO: simulation finished"
-quit -f

@@ -131,8 +131,39 @@ always @(posedge clk or negedge rstn) begin
 			end
 
 			RD_WAIT: begin
-				if (!write_active)
-					read_state <= RD_READ;
+				if (!write_active) begin
+					if (read_word_cache_hit) begin
+						if (!read_pending) begin
+							if (pixel_size) begin
+								if (crossword)
+									raw_buf[7:0] <= mem_di_shift[7:0];
+								else
+									raw_buf <= mem_di_shift[15:0];
+							end else begin
+								if (crossword) begin
+									if (unpk_byte_offset == 3'd6)
+										rgb_buf[15:0] <= mem_di_shift[15:0];
+									else
+										rgb_buf[7:0] <= mem_di_shift[7:0];
+								end else begin
+									rgb_buf <= mem_di_shift[23:0];
+								end
+							end
+						end else begin
+							if (pixel_size) begin
+								raw_buf[15:8] <= mem_di_shift[7:0];
+							end else begin
+								if (unpk_byte_offset == 3'd6)
+									rgb_buf[23:16] <= mem_di_shift[7:0];
+								else
+									rgb_buf[23:8] <= mem_di_shift[15:0];
+							end
+						end
+						read_state <= RD_DONE;
+					end else begin
+						read_state <= RD_READ;
+					end
+				end
 			end
 
 			RD_READ: begin
