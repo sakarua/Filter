@@ -1,8 +1,8 @@
 clear; clc;
 
 %% 参数设置（根据你的图像修改）
-width = 480;   
-height = 640;  
+width = 480;
+height = 640; 
 windowSize = 3; % 中值滤波窗口大小
 
 %% 直接读取 16bit 纯二进制灰度图
@@ -15,18 +15,12 @@ end
 rawData = fread(fileID, width * height, 'uint16=>uint16');
 fclose(fileID);
 
-% 检查读取的数据量是否完整
-if length(rawData) < width * height
-    error('文件中的数据量少于设定的宽*高，请检查分辨率是否正确！');
-end
 
-%% 【修复方案】恢复为标准的二维灰度图像矩阵 (height × width)
-% 常见的 RAW 文件是行优先存储，MATLAB 是列优先。
-% 先 reshape 成 (width, height)，再转置得到 (height, width)
-grayImage = reshape(rawData, width, height)'; 
+% 恢复为二维灰度图像矩阵（转置是因为 MATLAB 是列优先）
+grayImage = reshape(rawData, [width, height])';
 
 %% 中值滤波处理
-medianImage = zeros(height, width, 'uint16'); % 预分配内存
+medianImage = zeros(height, width, 'uint16'); % 预分配内存，指定 uint16 类型
 halfWindowSize = floor(windowSize / 2);
 
 for i = 1:height
@@ -48,6 +42,7 @@ figure;
 subplot(1, 2, 1);
 imshow(grayImage, []); % 使用 [] 自动拉伸 16bit 灰度对比度
 title('原灰度图像');
+
 subplot(1, 2, 2);
 imshow(medianImage, []); 
 title('中值滤波后图像');
@@ -59,11 +54,10 @@ file_id = fopen('matlab_raw.txt', 'w+');
 for row_index = 1:height
     for col_index = 1:width 
         % 以十六进制 (%04x) 格式写入 16bit 滤波后的像素值
-        fprintf(file_id, '%04x', medianImage(row_index, col_index);
-        fprintf(file_id, '\n'); % 每行结束后换行
+        fprintf(file_id, '%04x', medianImage(row_index, col_index));
+         fprintf(file_id, '\n'); % 每行结束后换行
     end
 end
-
 %% 关闭文件
 fclose(file_id);
-disp('处理完成并成功保存 txt 文件！');
+disp('处理完成，数据已成功保存！');

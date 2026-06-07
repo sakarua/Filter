@@ -1,10 +1,12 @@
+clear; clc;
+
+%% 参数设置（根据你的图像修改）
+img_width = 480;   
+img_height = 640;  
+windowSize = 3; % 中值滤波窗口大小
+
 %% 读取图像
 originalImage = imread('test_img.bmp');
-figure;
-%% 显示原图
-subplot(1, 3, 1);
-imshow(originalImage);
-title('原图像');
 %% 灰度化
 % 提取 R, G, B 三通道并转换为 uint32 以防乘法溢出
 R = uint32(originalImage(:, :, 1));
@@ -16,13 +18,12 @@ grayImage = bitsra(R*77 + G*150 + B*29, 8);
 
 % 换回 uint8 类型，确保与后续处理兼容
 grayImage = uint8(grayImage);
-%% 图像尺寸
-[img_height, img_width] = size(grayImage); 
-medianImage = zeros(img_height, img_width);
-%% 定义参数
-windowSize = 3;  % 窗口大小，奇数
+
+
 %% 遍历像素 计算窗口均值
+medianImage = zeros(img_height, img_width);
 halfWindowSize = floor(windowSize / 2);
+
 for i = 1:img_height
     for j = 1:img_width
         % 窗口边界
@@ -45,50 +46,36 @@ medianImage = uint8(medianImage);
 %% 将原图像转换为二值图像
 binarizedImage = imbinarize(grayImage);
 
+%% 显示图像
+figure;
+subplot(1, 3, 1);
+imshow(originalImage);
+title('原图像');
+
 subplot(1, 3, 2);
-imshow(rawCFA, []);
-title('原始CFA数据');
+imshow(grayImage);
+title('灰度化图像');
 
 subplot(1, 3, 3);
-imshow(filteredCFA, []);
-title('中值滤波后CFA');
+imshow(medianImage);
+title('中值滤波图像');
 
-%% 保存为TXT文件（十六进制格式）
-% 获取尺寸
-[img_height, img_width] = size(filteredCFA);
+%% 获取图像的尺寸信息
+[image_height, image_width, num_channels] = size(medianImage);
 
-% 打开文件
-fileID = fopen('median_filtered_raw.txt', 'w');
+%% 遍历每一个像素并写入到文件中
+file_id = fopen('matlab_bmp.txt', 'w+');
 
-% 写入数据
-for i = 1:img_height
-    for j = 1:img_width
-        % 获取像素值
-        pixelValue = filteredCFA(i, j);
-        
-        % 根据数据类型决定输出格式
-        if isa(pixelValue, 'uint16')
-            % 16位数据：输出4位十六进制
-            fprintf(fileID, '%04x', pixelValue);
-        elseif isa(pixelValue, 'uint8')
-            % 8位数据：输出2位十六进制
-            fprintf(fileID, '%02x', pixelValue);
-        else
-            % double类型：先转为uint16再输出
-            fprintf(fileID, '%04x', uint16(pixelValue));
+for row_index = 1:image_height
+    for col_index = 1:image_width 
+        for channel_index = 1:num_channels
+            % 将每个像素值写入文件，以十六进制格式表示
+            fprintf(file_id, '%02x', medianImage(row_index, col_index, channel_index));
         end
-        
-        % 每列之间加空格（可选，便于阅读）
-        if j < img_width
-            fprintf(fileID, ' ');
-        end
+        % 每行像素结束后换行
+        fprintf(file_id, '\n');
     end
-    % 每行结束后换行
-    fprintf(fileID, '\n');
 end
 
-% 关闭文件
-fclose(fileID);
-
-fprintf('TXT文件已保存：median_filtered_raw.txt\n');
-fprintf('图像尺寸：%d × %d\n', img_height, img_width);
+%% 关闭文件
+fclose(file_id);
