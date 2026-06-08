@@ -33,6 +33,9 @@ reg  [2:0]  filter_valid_pipe;
 reg  [31:0] center_index_d0;
 reg  [31:0] center_index_d1;
 reg  [31:0] center_index_d2;
+reg  [2:0]  raw_latency_count;
+reg  [31:0] raw_out_index;
+reg         raw_frame_done;
 reg  [31:0] write_byte_addr;
 reg  [15:0] write_data;
 
@@ -79,6 +82,9 @@ wire        pack_start_write = !pixel_size && (write_state == WR_IDLE) && (pack_
 wire        start_write  = raw_start_write || pack_start_write;
 wire [31:0] total_pixels = frame_width * frame_height;
 wire        filter_in_frame = filter_valid && (center_index_d2 < total_pixels);
+wire        raw_filter_ready = (raw_latency_count == 3'd4);
+wire        raw_enqueue = pixel_size && filter_valid && raw_filter_ready && !raw_frame_done &&
+						  (raw_out_index < total_pixels) && !fifo_full;
 wire        last_filter_pixel = (center_index_d2 + 32'd1) == total_pixels;
 wire [31:0] rgb_byte_addr = baseImageO + center_index_d2;
 assign write_pending = pixel_size ? (fifo_count != 0) : (pack_fifo_count != 0);
@@ -89,11 +95,34 @@ always @(posedge clk or negedge rstn) begin
 		center_index_d0   <= 32'd0;
 		center_index_d1   <= 32'd0;
 		center_index_d2   <= 32'd0;
+		raw_latency_count <= 3'd0;
+		raw_out_index     <= 32'd0;
+		raw_frame_done    <= 1'b0;
 	end else begin
 		filter_valid_pipe <= {filter_valid_pipe[1:0], window_valid};
 		center_index_d0   <= window_center_index;
 		center_index_d1   <= center_index_d0;
 		center_index_d2   <= center_index_d1;
+
+		if (!pixel_size) begin
+			raw_latency_count <= 3'd0;
+			raw_out_index     <= 32'd0;
+			raw_frame_done    <= 1'b0;
+		end else if (raw_frame_done && gray_valid && (gray_index == 32'd0)) begin
+			raw_latency_count <= 3'd0;
+			raw_out_index     <= 32'd0;
+			raw_frame_done    <= 1'b0;
+		end else if (filter_valid && !raw_frame_done) begin
+			if (!raw_filter_ready) begin
+				raw_latency_count <= raw_latency_count + 3'd1;
+			end else if (raw_enqueue) begin
+				if ((raw_out_index + 32'd1) >= total_pixels) begin
+					raw_frame_done <= 1'b1;
+				end else begin
+					raw_out_index <= raw_out_index + 32'd1;
+				end
+			end
+		end
 	end
 end
 
@@ -132,8 +161,8 @@ always @(posedge clk or negedge rstn) begin
 		rgb_lane_mask        = ~(8'b0000_0001 << rgb_lane);
 		rgb_lane_word        = ({56'd0, filter_data[7:0]} << {rgb_lane, 3'b000});
 
-		if (filter_in_frame && pixel_size && !fifo_full) begin
-			fifo_index[wr_ptr_next] <= center_index_d2;
+		if (raw_enqueue) begin
+			fifo_index[wr_ptr_next] <= raw_out_index;
 			fifo_data [wr_ptr_next] <= filter_data;
 			wr_ptr_next             = wr_ptr_next + {{(FIFO_AW-1){1'b0}}, 1'b1};
 			fifo_count_next         = fifo_count_next + {{FIFO_AW{1'b0}}, 1'b1};
