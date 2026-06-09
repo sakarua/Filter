@@ -1,5 +1,5 @@
-// Median filter (3x3) with mask support and 3-cycle pipeline latency.
-// Timing-friendly implementation: row sort + median-of-three composition.
+// Median filter (3x3) with mask support and exact median behavior.
+// Keeps 3-cycle output latency.
 module median_filter_3x3 #(
     parameter DATA_WIDTH = 16
 ) (
@@ -18,140 +18,101 @@ module median_filter_3x3 #(
     output wire [DATA_WIDTH-1:0]    target_data
 );
 
-function [DATA_WIDTH-1:0] min2;
-    input [DATA_WIDTH-1:0] a;
-    input [DATA_WIDTH-1:0] b;
-    begin
-        min2 = (a < b) ? a : b;
+reg [DATA_WIDTH-1:0] val [0:8];
+reg [DATA_WIDTH-1:0] pack [0:8];
+reg [DATA_WIDTH-1:0] sort_s1 [0:8];
+reg [DATA_WIDTH-1:0] sort_s1_r [0:8];
+reg [DATA_WIDTH-1:0] sort_s2 [0:8];
+reg [DATA_WIDTH-1:0] swap_tmp_s1;
+reg [DATA_WIDTH-1:0] swap_tmp_s2;
+reg [DATA_WIDTH-1:0] median_comb_s2;
+reg [3:0]            count_s1_r;
+reg [DATA_WIDTH-1:0] median_d0;
+reg [DATA_WIDTH-1:0] median_d1;
+reg [DATA_WIDTH-1:0] median_d2;
+reg [DATA_WIDTH:0]   sum_mid_s2;
+integer i;
+integer j;
+integer count;
+
+always @* begin
+    val[0] = data11; val[1] = data12; val[2] = data13;
+    val[3] = data21; val[4] = data22; val[5] = data23;
+    val[6] = data31; val[7] = data32; val[8] = data33;
+
+    count = 0;
+    for (i = 0; i < 9; i = i + 1) begin
+        if (mask[i]) begin
+            pack[count] = val[i];
+            count = count + 1;
+        end
     end
-endfunction
 
-function [DATA_WIDTH-1:0] max2;
-    input [DATA_WIDTH-1:0] a;
-    input [DATA_WIDTH-1:0] b;
-    begin
-        max2 = (a > b) ? a : b;
+    for (i = 0; i < 9; i = i + 1) begin
+        if (i >= count)
+            pack[i] = {DATA_WIDTH{1'b1}};
     end
-endfunction
 
-function [DATA_WIDTH-1:0] med3;
-    input [DATA_WIDTH-1:0] a;
-    input [DATA_WIDTH-1:0] b;
-    input [DATA_WIDTH-1:0] c;
-    begin
-        med3 = max2(min2(a, b), min2(max2(a, b), c));
-    end
-endfunction
+    for (i = 0; i < 9; i = i + 1)
+        sort_s1[i] = pack[i];
 
-reg [DATA_WIDTH-1:0] s0_d0;
-reg [DATA_WIDTH-1:0] s1_d0;
-reg [DATA_WIDTH-1:0] s2_d0;
-reg [DATA_WIDTH-1:0] s3_d0;
-reg [DATA_WIDTH-1:0] s4_d0;
-reg [DATA_WIDTH-1:0] s5_d0;
-reg [DATA_WIDTH-1:0] s6_d0;
-reg [DATA_WIDTH-1:0] s7_d0;
-reg [DATA_WIDTH-1:0] s8_d0;
-
-reg [DATA_WIDTH-1:0] row0_min_d1;
-reg [DATA_WIDTH-1:0] row0_mid_d1;
-reg [DATA_WIDTH-1:0] row0_max_d1;
-reg [DATA_WIDTH-1:0] row1_min_d1;
-reg [DATA_WIDTH-1:0] row1_mid_d1;
-reg [DATA_WIDTH-1:0] row1_max_d1;
-reg [DATA_WIDTH-1:0] row2_min_d1;
-reg [DATA_WIDTH-1:0] row2_mid_d1;
-reg [DATA_WIDTH-1:0] row2_max_d1;
-
-reg [DATA_WIDTH-1:0] max_of_mins_d2;
-reg [DATA_WIDTH-1:0] mid_of_mids_d2;
-reg [DATA_WIDTH-1:0] min_of_maxs_d2;
-reg [DATA_WIDTH-1:0] median_d3;
-
-wire [DATA_WIDTH-1:0] m0 = mask[0] ? data11 : data22;
-wire [DATA_WIDTH-1:0] m1 = mask[1] ? data12 : data22;
-wire [DATA_WIDTH-1:0] m2 = mask[2] ? data13 : data22;
-wire [DATA_WIDTH-1:0] m3 = mask[3] ? data21 : data22;
-wire [DATA_WIDTH-1:0] m4 = mask[4] ? data22 : data22;
-wire [DATA_WIDTH-1:0] m5 = mask[5] ? data23 : data22;
-wire [DATA_WIDTH-1:0] m6 = mask[6] ? data31 : data22;
-wire [DATA_WIDTH-1:0] m7 = mask[7] ? data32 : data22;
-wire [DATA_WIDTH-1:0] m8 = mask[8] ? data33 : data22;
-
-wire [DATA_WIDTH-1:0] row0_min_w = min2(min2(s0_d0, s1_d0), s2_d0);
-wire [DATA_WIDTH-1:0] row0_max_w = max2(max2(s0_d0, s1_d0), s2_d0);
-wire [DATA_WIDTH-1:0] row0_mid_w = med3(s0_d0, s1_d0, s2_d0);
-wire [DATA_WIDTH-1:0] row1_min_w = min2(min2(s3_d0, s4_d0), s5_d0);
-wire [DATA_WIDTH-1:0] row1_max_w = max2(max2(s3_d0, s4_d0), s5_d0);
-wire [DATA_WIDTH-1:0] row1_mid_w = med3(s3_d0, s4_d0, s5_d0);
-wire [DATA_WIDTH-1:0] row2_min_w = min2(min2(s6_d0, s7_d0), s8_d0);
-wire [DATA_WIDTH-1:0] row2_max_w = max2(max2(s6_d0, s7_d0), s8_d0);
-wire [DATA_WIDTH-1:0] row2_mid_w = med3(s6_d0, s7_d0, s8_d0);
-
-wire [DATA_WIDTH-1:0] max_of_mins_w = max2(max2(row0_min_d1, row1_min_d1), row2_min_d1);
-wire [DATA_WIDTH-1:0] mid_of_mids_w = med3(row0_mid_d1, row1_mid_d1, row2_mid_d1);
-wire [DATA_WIDTH-1:0] min_of_maxs_w = min2(min2(row0_max_d1, row1_max_d1), row2_max_d1);
-wire [DATA_WIDTH-1:0] median_w = med3(max_of_mins_d2, mid_of_mids_d2, min_of_maxs_d2);
-
-always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        s0_d0 <= {DATA_WIDTH{1'b0}};
-        s1_d0 <= {DATA_WIDTH{1'b0}};
-        s2_d0 <= {DATA_WIDTH{1'b0}};
-        s3_d0 <= {DATA_WIDTH{1'b0}};
-        s4_d0 <= {DATA_WIDTH{1'b0}};
-        s5_d0 <= {DATA_WIDTH{1'b0}};
-        s6_d0 <= {DATA_WIDTH{1'b0}};
-        s7_d0 <= {DATA_WIDTH{1'b0}};
-        s8_d0 <= {DATA_WIDTH{1'b0}};
-
-        row0_min_d1 <= {DATA_WIDTH{1'b0}};
-        row0_mid_d1 <= {DATA_WIDTH{1'b0}};
-        row0_max_d1 <= {DATA_WIDTH{1'b0}};
-        row1_min_d1 <= {DATA_WIDTH{1'b0}};
-        row1_mid_d1 <= {DATA_WIDTH{1'b0}};
-        row1_max_d1 <= {DATA_WIDTH{1'b0}};
-        row2_min_d1 <= {DATA_WIDTH{1'b0}};
-        row2_mid_d1 <= {DATA_WIDTH{1'b0}};
-        row2_max_d1 <= {DATA_WIDTH{1'b0}};
-
-        max_of_mins_d2 <= {DATA_WIDTH{1'b0}};
-        mid_of_mids_d2 <= {DATA_WIDTH{1'b0}};
-        min_of_maxs_d2 <= {DATA_WIDTH{1'b0}};
-        median_d3 <= {DATA_WIDTH{1'b0}};
-    end else begin
-        // stage-0: mask invalid border taps to center pixel
-        s0_d0 <= m0;
-        s1_d0 <= m1;
-        s2_d0 <= m2;
-        s3_d0 <= m3;
-        s4_d0 <= m4;
-        s5_d0 <= m5;
-        s6_d0 <= m6;
-        s7_d0 <= m7;
-        s8_d0 <= m8;
-
-        // stage-1: sort each row into min/mid/max
-        row0_min_d1 <= row0_min_w;
-        row0_mid_d1 <= row0_mid_w;
-        row0_max_d1 <= row0_max_w;
-        row1_min_d1 <= row1_min_w;
-        row1_mid_d1 <= row1_mid_w;
-        row1_max_d1 <= row1_max_w;
-        row2_min_d1 <= row2_min_w;
-        row2_mid_d1 <= row2_mid_w;
-        row2_max_d1 <= row2_max_w;
-
-        // stage-2: reduce three row results into three candidates
-        max_of_mins_d2 <= max_of_mins_w;
-        mid_of_mids_d2 <= mid_of_mids_w;
-        min_of_maxs_d2 <= min_of_maxs_w;
-
-        // stage-3: compose exact median of 9
-        median_d3 <= median_w;
+    // First half sort passes.
+    for (i = 0; i < 4; i = i + 1) begin
+        for (j = 0; j < 8; j = j + 1) begin
+            if (sort_s1[j] > sort_s1[j + 1]) begin
+                swap_tmp_s1 = sort_s1[j];
+                sort_s1[j] = sort_s1[j + 1];
+                sort_s1[j + 1] = swap_tmp_s1;
+            end
+        end
     end
 end
 
-    assign target_data = median_d3;
+always @* begin
+    sum_mid_s2 = {(DATA_WIDTH+1){1'b0}};
+    for (i = 0; i < 9; i = i + 1)
+        sort_s2[i] = sort_s1_r[i];
+
+    // Second half sort passes.
+    for (i = 0; i < 5; i = i + 1) begin
+        for (j = 0; j < 8; j = j + 1) begin
+            if (sort_s2[j] > sort_s2[j + 1]) begin
+                swap_tmp_s2 = sort_s2[j];
+                sort_s2[j] = sort_s2[j + 1];
+                sort_s2[j + 1] = swap_tmp_s2;
+            end
+        end
+    end
+
+    if (count_s1_r <= 0) begin
+        median_comb_s2 = {DATA_WIDTH{1'b0}};
+    end else if (count_s1_r[0]) begin
+        median_comb_s2 = sort_s2[count_s1_r >> 1];
+    end else begin
+        // For even valid count on borders, use average of two middle values.
+        sum_mid_s2 = sort_s2[(count_s1_r >> 1) - 1] + sort_s2[count_s1_r >> 1];
+        median_comb_s2 = (sum_mid_s2 + 1'b1) >> 1;
+    end
+end
+
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        count_s1_r <= 4'd0;
+        for (i = 0; i < 9; i = i + 1)
+            sort_s1_r[i] <= {DATA_WIDTH{1'b0}};
+        median_d0 <= {DATA_WIDTH{1'b0}};
+        median_d1 <= {DATA_WIDTH{1'b0}};
+        median_d2 <= {DATA_WIDTH{1'b0}};
+    end else begin
+        count_s1_r <= count[3:0];
+        for (i = 0; i < 9; i = i + 1)
+            sort_s1_r[i] <= sort_s1[i];
+        median_d0 <= median_comb_s2;
+        median_d1 <= median_d0;
+        median_d2 <= median_d1;
+    end
+end
+
+assign target_data = median_d2;
 
 endmodule
