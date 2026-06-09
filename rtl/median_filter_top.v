@@ -281,11 +281,37 @@ sram_writer u_sram_writer (
 	.write_word        (write_word)
 );
 
-wire mem_read = read_req && !write_active;
+(* IOB = "TRUE" *) reg        mem_csn_r;
+(* IOB = "TRUE" *) reg [ 7:0] mem_wen_r;
+(* IOB = "TRUE" *) reg [20:0] mem_adr_r;
+(* IOB = "TRUE" *) reg [63:0] mem_do_r;
 
-assign mem_csn = ~(mem_read || write_active);
-assign mem_wen = write_active ? write_mask : 8'hff;
-assign mem_adr = write_active ? write_addr : read_addr;
-assign mem_do  = write_active ? write_word : 64'd0;
+always @(posedge clk) begin
+	if (!rstn) begin
+		mem_csn_r <= 1'b1;
+		mem_wen_r <= 8'hff;
+		mem_adr_r <= 21'd0;
+		mem_do_r  <= 64'd0;
+	end else if (write_active) begin
+		mem_csn_r <= 1'b0;
+		mem_wen_r <= write_mask;
+		mem_adr_r <= write_addr;
+		mem_do_r  <= write_word;
+	end else if (read_req) begin
+		mem_csn_r <= 1'b0;
+		mem_wen_r <= 8'hff;
+		mem_adr_r <= read_addr;
+		mem_do_r  <= 64'd0;
+	end else begin
+		mem_csn_r <= 1'b1;
+		mem_wen_r <= 8'hff;
+		mem_do_r  <= 64'd0;
+	end
+end
+
+assign mem_csn = mem_csn_r;
+assign mem_wen = mem_wen_r;
+assign mem_adr = mem_adr_r;
+assign mem_do  = mem_do_r;
 
 endmodule

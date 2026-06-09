@@ -35,6 +35,7 @@ integer              init_idx;
 
 reg [15:0] col;
 reg [15:0] row;
+reg [31:0] row_base;
 
 reg [DATA_WIDTH-1:0] line0_d1;
 reg [DATA_WIDTH-1:0] line0_d2;
@@ -44,11 +45,13 @@ reg [DATA_WIDTH-1:0] curr_d1;
 reg [DATA_WIDTH-1:0] curr_d2;
 
 wire width_last = (col == stream_width - 16'd1);
+wire [31:0] center_col_ext = {16'd0, (col - 16'd1)};
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         col          <= 16'd0;
         row          <= 16'd0;
+        row_base     <= 32'd0;
         line0_d1     <= {DATA_WIDTH{1'b0}};
         line0_d2     <= {DATA_WIDTH{1'b0}};
         line1_d1     <= {DATA_WIDTH{1'b0}};
@@ -75,6 +78,7 @@ always @(posedge clk or negedge rst_n) begin
     end else if (frame_start) begin
         col          <= 16'd0;
         row          <= 16'd0;
+        row_base     <= 32'd0;
         line0_d1     <= {DATA_WIDTH{1'b0}};
         line0_d2     <= {DATA_WIDTH{1'b0}};
         line1_d1     <= {DATA_WIDTH{1'b0}};
@@ -97,7 +101,7 @@ always @(posedge clk or negedge rst_n) begin
                 window_valid <= 1'b1;
                 center_row   <= row - 16'd1;
                 center_col   <= col - 16'd1;
-                center_index <= ((row - 16'd1) * frame_width) + (col - 16'd1);
+                center_index <= row_base + center_col_ext;
                 data11       <= line0_d2;
                 data12       <= line0_d1;
                 data13       <= line0[col];
@@ -115,6 +119,10 @@ always @(posedge clk or negedge rst_n) begin
             if (width_last) begin
                 col      <= 16'd0;
                 row      <= row + 16'd1;
+                if (row >= 16'd1)
+                    row_base <= row_base + {16'd0, frame_width};
+                else
+                    row_base <= 32'd0;
                 line0_d1 <= {DATA_WIDTH{1'b0}};
                 line0_d2 <= {DATA_WIDTH{1'b0}};
                 line1_d1 <= {DATA_WIDTH{1'b0}};

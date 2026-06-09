@@ -29,10 +29,16 @@ localparam FIFO_AW    = 5;
 localparam FIFO_DEPTH = 1 << FIFO_AW;
 
 reg  [1:0]  write_state;
-reg  [2:0]  filter_valid_pipe;
+(* shreg_extract = "no" *)
+reg  [3:0]  filter_valid_pipe;
+(* shreg_extract = "no" *)
 reg  [31:0] center_index_d0;
+(* shreg_extract = "no" *)
 reg  [31:0] center_index_d1;
+(* shreg_extract = "no" *)
 reg  [31:0] center_index_d2;
+(* shreg_extract = "no" *)
+reg  [31:0] center_index_d3;
 reg  [2:0]  raw_latency_count;
 reg  [31:0] raw_out_index;
 reg         raw_frame_done;
@@ -74,35 +80,37 @@ reg  [20:0]         write_word_addr_reg;
 reg  [ 7:0]         write_mask_reg;
 reg  [63:0]         write_word_reg;
 
-wire        filter_valid = filter_valid_pipe[2];
+wire        filter_valid = filter_valid_pipe[3];
 wire        fifo_full    = (fifo_count > (FIFO_DEPTH - 2));
 wire        pack_fifo_full = (pack_fifo_count > (FIFO_DEPTH - 2));
 wire        raw_start_write = pixel_size && (write_state == WR_IDLE) && (fifo_count != 0) && !read_active;
 wire        pack_start_write = !pixel_size && (write_state == WR_IDLE) && (pack_fifo_count != 0) && !read_active;
 wire        start_write  = raw_start_write || pack_start_write;
 wire [31:0] total_pixels = frame_width * frame_height;
-wire        filter_in_frame = filter_valid && (center_index_d2 < total_pixels);
+wire        filter_in_frame = filter_valid && (center_index_d3 < total_pixels);
 wire        raw_filter_ready = (raw_latency_count == 3'd4);
 wire        raw_enqueue = pixel_size && filter_valid && raw_filter_ready && !raw_frame_done &&
 						  (raw_out_index < total_pixels) && !fifo_full;
-wire        last_filter_pixel = (center_index_d2 + 32'd1) == total_pixels;
-wire [31:0] rgb_byte_addr = baseImageO + center_index_d2;
+wire        last_filter_pixel = (center_index_d3 + 32'd1) == total_pixels;
+wire [31:0] rgb_byte_addr = baseImageO + center_index_d3;
 assign write_pending = pixel_size ? (fifo_count != 0) : (pack_fifo_count != 0);
 
 always @(posedge clk or negedge rstn) begin
 	if (!rstn) begin
-		filter_valid_pipe <= 3'b0;
+		filter_valid_pipe <= 4'b0;
 		center_index_d0   <= 32'd0;
 		center_index_d1   <= 32'd0;
 		center_index_d2   <= 32'd0;
+		center_index_d3   <= 32'd0;
 		raw_latency_count <= 3'd0;
 		raw_out_index     <= 32'd0;
 		raw_frame_done    <= 1'b0;
 	end else begin
-		filter_valid_pipe <= {filter_valid_pipe[1:0], window_valid};
+		filter_valid_pipe <= {filter_valid_pipe[2:0], window_valid};
 		center_index_d0   <= window_center_index;
 		center_index_d1   <= center_index_d0;
 		center_index_d2   <= center_index_d1;
+		center_index_d3   <= center_index_d2;
 
 		if (!pixel_size) begin
 			raw_latency_count <= 3'd0;
